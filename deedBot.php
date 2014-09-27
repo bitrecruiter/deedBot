@@ -500,6 +500,55 @@ $GRIBBLE_DATA=Array
 
 
 
+//################################
+//# the private key must be in your key ring
+//#
+function DECRYPT($DOCFILE){
+	global $DEBUG;
+
+	$descs=array(0=>array('pipe','r'),1=>array('pipe','w'),2=>array('pipe','w'));
+
+	$PASSPHRASE='[your keyring passphrase for your WoT-registered encryption key]';
+
+	$FHV=proc_open("gpg -u MolokoDesk --keyid-format long --no-tty --passphrase $PASSPHRASE --decrypt $DOCFILE",$descs,$pipes);
+
+	fclose($pipes[0]);
+
+	$STDOUT=stream_get_contents($pipes[1]);
+	$STDERR=stream_get_contents($pipes[2]);
+
+	//print $STDOUT;
+
+	proc_close($FHV);
+
+	return($STDOUT);
+
+}//END FUNCTION DECRYPT
+//################################
+
+
+//#################################
+//# this decrypts the gribble WoT challenge string
+//#
+function gribble_challenge_decrypt(){
+
+	$KEYID_16='012346789ABCDEF0';	//your 16-bit hex gpg KEY_ID registered with #bitcoin-otc WoT
+
+	$tempfile_name='gcs_temp_'.microtime(true).'.asc';
+
+	$otp_link='http://bitcoin-otc.com/otps/'.$KEYID_16;
+
+	file_put_contents($tempfile_name,file_get_contents($otp_link));
+
+	$result=DECRYPT($tempfile_name);
+
+	unlink($tempfile_name);
+
+	return($result);
+
+}//END FUNCTION gribble_challenge_decrypt
+//############################
+//rdisp(gribble_challenge_decrypt());die("\ntesting gribble_challenge_decrypt() ... comment out this line.\n"); //unit test.
 
 
 
