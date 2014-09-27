@@ -1,8 +1,4 @@
 <?php
-//### split_bundled_documents.php Sept-2014 MolokoDesk
-//### required for: deedBot.php
-//###
-//###this is still a separate module (returns a json data structure), but could be integrated into deedBot.php
 
 
 // allow PHP to report errors to HTML output, ignoring non-fatal/recoverable errors
@@ -62,7 +58,6 @@ function VERIFY_TEST($DOCFILE){
 	global $CDEX;
 	global $NICK;
 
-
 	$descs=array(0=>array('pipe','r'),1=>array('pipe','w'),2=>array('pipe','w'));
 
 	$FHV=proc_open("gpg --keyid-format long --verify -v $DOCFILE",$descs,$pipes);
@@ -114,6 +109,10 @@ function VERIFY_TEST($DOCFILE){
 	return(array('keyID'=>$KEY_ID,'nsigs'=>$NSIGS));
 
 
+
+
+
+
 }//END FUNCTION VERIFY
 //################################
 
@@ -151,7 +150,6 @@ function DOC_SPLIT($DOXFILE){
 
 /*
 
-
 $ gpg --version
 gpg (GnuPG) 1.4.9
 Copyright (C) 2008 Free Software Foundation, Inc.
@@ -167,13 +165,13 @@ Hash: MD5, SHA1, RIPEMD160, SHA256, SHA384, SHA512, SHA224
 Compression: Uncompressed, ZIP, ZLIB, BZIP2
 
 
-
-
 */
 
 
 
 $DEBUG=getparms('DEBUG',false);
+$VERBOSE=getparms('VERBOSE',false);
+
 
 $DOCUMENT_BUNDLE_URL=getparms('DOC',false);
 $DOCUMENT_BUNDLE_URL=urldecode(getparms('URL',$DOCUMENT_BUNDLE_URL));
@@ -183,19 +181,19 @@ if($DOCUMENT_BUNDLE_URL=='test'){$DOCUMENT_BUNDLE_URL='signed_CONCAT_DOX.txt';}
 
 $DOCUMENT_BUNDLE_URL_FORM=$DOCUMENT_BUNDLE_URL;
 
-print "\n\nsplit_bundled_documents: $DOCUMENT_BUNDLE_URL_FORM = $DOCUMENT_BUNDLE_URL\n\n";
+if($VERBOSE){print "\n\nsplit_bundled_documents: $DOCUMENT_BUNDLE_URL_FORM = $DOCUMENT_BUNDLE_URL\n\n";}
 
 if(preg_match('/pastebin.com\/raw\.php\?i\=([a-zA-Z0-9]+)/',$DOCUMENT_BUNDLE_URL,$bx)){
-	print "\n\nRAW  $DOCUMENT_BUNDLE_URL = ";
+	if($VERBOSE){print "\n\nRAW  $DOCUMENT_BUNDLE_URL = ";}
 	$PBCODE=$bx[1];
 	$DOCUMENT_BUNDLE_URL='http://pastebin.com/raw.php?i='.$PBCODE;
-	print " $DOCUMENT_BUNDLE_URL = $PBCODE\n\n";
+	if($VERBOSE){print " $DOCUMENT_BUNDLE_URL = $PBCODE\n\n";}
 
 }elseif(preg_match('/pastebin.com\/([a-zA-Z0-9]+)/',$DOCUMENT_BUNDLE_URL,$bx)){
-	print "\n\nPLAIN $DOCUMENT_BUNDLE_URL = ";
+	if($VERBOSE){print "\n\nPLAIN $DOCUMENT_BUNDLE_URL = ";}
 	$PBCODE=$bx[1];
 	$DOCUMENT_BUNDLE_URL='http://pastebin.com/raw.php?i='.$PBCODE;
-	print " $DOCUMENT_BUNDLE_URL = $PBCODE\n\n";
+	if($VERBOSE){print " $DOCUMENT_BUNDLE_URL = $PBCODE\n\n";}
 
 }else{
 	$PBCODE=$DOCUMENT_BUNDLE_URL;
@@ -239,7 +237,7 @@ if($DOCUMENT_BUNDLE_URL){
 
 	if($DEBUG){rdisp($QARR);}
 
-	print "PASTEBIN BUNDLE RESPONSE: ($PBCODE)\n";
+	if($VERBOSE){print "PASTEBIN BUNDLE RESPONSE: ($PBCODE)\n";}
 	$JDATA=json_encode($QARR);
 	print $JDATA;
 	print "\n";
@@ -248,6 +246,19 @@ if($DOCUMENT_BUNDLE_URL){
 
 
 }//ENDIF DOCUMENT URL EXISTS
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
