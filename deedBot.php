@@ -1,6 +1,6 @@
 <?php
 //deedBot.php 2014.Sep.19 MolokoDesk ... final bot wrapper for cryptocontracts/deed notarize document hash to blockchain project
-
+//deedBot.php 2014.Sep.26 MolokoDesk ... revised/working
 
 /*
 
@@ -93,7 +93,7 @@ function CONNECT_TO_FREENODE(){
 	$ircaddress='chat.freenode.net';
 	$ircport='6667';
 	$ircnick='deedBot';
-	$ircpassword='[deedbot password whatever it is]';
+	$ircpassword='[deedBot Password Here]';
 	$FHI = fsockopen($ircaddress,$ircport,$err_num_irc,$err_msg_irc,10);
 	stream_set_timeout($FHI,1);
 	print "\nerr_num_irc=$err_num_irc err_msg_irc=$err_msg_irc\n";
@@ -176,8 +176,7 @@ Code: [...]
 */
 
 //######################
-$BLOCKCHAIN_INFO_API_KEY='[YOUR BLOCKCHAIN.INFO API KEY HERE]';	//api key took two days to arrive in email after request form submitted
-//$BLOCKCHAIN_INFO_API_KEY=false; //uncomment this to do it without an API key;
+$BLOCKCHAIN_INFO_API_KEY='[blockchain.info API key Here]';	//api key took two days to arrive in email after request form submitted
 function TRACK_PENDING_BUNDLES(){
 	global $PENDING_BUNDLES;
 	global $TRACKING_CHAN;
@@ -374,84 +373,7 @@ function SCRAPE_BKCHAIN(){
 }//END FUNCTION SCRAPE_BKCHAIN
 //############################################
 
-//#####################
-function FAKE_TRACKABLE_PENDING_BUNDLES(){
-	global $DEBUG;
-	global $PENDING_PATH;
-	global $DEEDBOT_CHAN,$ERROR_CHAN;
-	global $PREVIOUS_BLOCK_HASH;
-	global $USE_BLOCKCHAIN_INFO;
 
-
-	print "\n\n-----------FAKE TRACK-------------\n";
-
-
-if($USE_BLOCKCHAIN_INFO){
-
-	$TARR=json_decode(file_get_contents('http://blockchain.info/unconfirmed-transactions?format=json'),true);
-	if(!$TARR){
-		send("PRIVMSG $ERROR_CHAN :*** http://blockchain.info/unconfirmed-transactions?format=json  API call failed in FAKE_TRACKABLE_PENDING_BUNDLES. ***");
-		send("PRIVMSG $DEEDBOT_CHAN :*** http://blockchain.info/unconfirmed-transactions?format=json  API call failed in FAKE_TRACKABLE_PENDING_BUNDLES. ***");
-		print "\n\n*** http://blockchain.info/unconfirmed-transactions?format=json  API call failed. ***\n\n";
-		return('error');
-	}//ENDIF OBVIOUS ERROR
-
-	$MARR=array();
-
-	$ADDR='^1[0-9][A-Za-z]{3}';
-
-	if($ADDR){
-		$RX='/'.$ADDR.'/';
-		foreach($TARR['txs'] as $tk=>$tv){
-			foreach($tv['out'] as $ok=>$ov){
-				if(isset($ov['addr'])){
-					$OUTPUT=$ov['addr'];
-					if($DEBUG>1){print "<br>$RX $OUTPUT\n";}
-					if(preg_match($RX,$OUTPUT)){
-						$TXID=$ov['tx_index'];
-						$MARR[$OUTPUT]=$TXID;
-					}//ENDIF INPUT OR OUTPUT MATCHES ADDRESS PATTERN
-				}else{
-					//rdisp($ov);
-				}//ENDIF OUTPUT ADDRESS PRESENT
-			}//NEXT OUTPUT
-		}//NEXT UNCONFIRMED TX
-
-		$AQ=array_rand($MARR);
-		$PENDING_SPOOF=$PENDING_PATH.'/BUNDLE_PENDING-'.$AQ.'.txt';
-
-		print "\n\nFAKE_TRACKABLE_PENDING_BUNDLES: $PENDING_SPOOF\n\n";
-		file_put_contents($PENDING_SPOOF,'This is a fake deed with a trackable bitcoin address.'."\n$PENDING_SPOOF\n".date('D Y-M-d H:i:s T',time())."\n\n");
-
-		return($PENDING_SPOOF);
-	}//ENDIF FIND UNCONFIRMED TRANSACTION FOR ADDRESS
-
-
-	return(false);
-
-}else{
-
-
-	$QQM=SCRAPE_BKCHAIN();  //the horror...
-	rdisp($QQM);
-	$MARR=array_flip($QQM['addresses']);
-	rdisp($MARR);
-	if(isset($QQM['addresses'][0])){
-		$AQ=$QQM['addresses'][0];
-		$PENDING_SPOOF=$PENDING_PATH.'/BUNDLE_PENDING-'.$AQ.'.txt';
-		print "\n\nFAKE_TRACKABLE_PENDING_BUNDLES: $PENDING_SPOOF\n\n";
-		file_put_contents($PENDING_SPOOF,'This is a fake deed with a trackable bitcoin address.'."\n$PENDING_SPOOF\n".date('D Y-M-d H:i:s T',time())."\n\n");
-		return($PENDING_SPOOF);
-	}//ENDIF ADDRESSES EXIST
-
-	return(false);
-
-}//ENDIF USE BLOCKCHAIN.INFO API OR BKCHAIN.ORG SCRAPING
-
-
-
-}//END FUNCTION FAKE_TRACKABLE_PENDING_BUNDLES
-//#####################
 
 
 
@@ -465,52 +387,45 @@ $ALL_SIGS_RECEIVED=false;
 function BUNDLE_TRUST_DONE_YET(){
 	global $GRIBBLE_DATA;
 	global $SIGSDONE,$ALL_SIGS_DONE,$ALL_SIGS_RECEIVED;
+	global $ASKING_KEYID,$ASKING_TRUST;
 
-	if(isset($GRIBBLE_DATA['KEYS']) && isset($GRIBBLE_DATA['NICKS']) ){
-		$KEY_COUNT=count($GRIBBLE_DATA['KEYS']);
-		$NICK_COUNT=0;
-		foreach($GRIBBLE_DATA['NICKS'] as $gnk=>$gnv){
-			if($gnk=='No such user registered.'){
-				$NICK_COUNT+=$gnv['COUNT'];
-			}elseif( isset($gnv['TIME']) ){
-				$NICK_COUNT++;
-			}//ENDIF SPECIAL CASE
-		}//NEXT COUNT NICK RESPONSES
+	$DONE_COUNTER=0;
+	$KEYID_COUNTER=0;
 
-		if($KEY_COUNT == $NICK_COUNT){
-			//DONE? DO STUFF TO MAKE THIS GET BUNDLE_QUEUED ... BACK-COMPATIBILITY AWKWARDISM ... NEEDS A REWRITE HERE AND ELSEWHERE
-			print "\nBUNDLE_TRUST_SCAN: DONE. NICK_COUNT=$NICK_COUNT = KEY_COUNT=$KEY_COUNT\n";
-			print "\nALL_SIGS_DONE=$ALL_SIGS_DONE ALL_SIGS_RECEIVED=$ALL_SIGS_RECEIVED\nSIGSDONE=\n";
-			rdisp($SIGSDONE);
-			$ALL_SIGS_RECEIVED=true;
-			foreach($SIGSDONE as $sdk=>$sdv){
-				if( isset($GRIBBLE_DATA['KEYS'][$sdk]) ){
-					$QNICK=$GRIBBLE_DATA['KEYS'][$sdk]['NICK'];
-					print "\nKEYSIG: $sdk NICK: $QNICK RECOGNIZED BY GRIBBLE\n";
-					$QTRUST=$GRIBBLE_DATA['KEYS'][$sdk]['TRUST'];
-					if($QTRUST >= 2){
-						print "\nKEYSIG: $sdk NICK: $QNICK TRUSTED ($QTRUST) BY GRIBBLE\n";
-						$SIGSDONE[$sdk]['done']=1;
-						$SIGSDONE[$sdk]['nick']=$QNICK;
-						$SIGSDONE[$sdk]['trust']=$QTRUST;
-					}else{
-						print "\nKEYSIG: $sdk NICK: $QNICK NOT TRUSTED ($QTRUST) BY GRIBBLE\n";
-					}//ENDIF SIGNATURE TRUSTED OR NOT
-				}else{
-					print "\nKEYSIG: $sdk UNKNOWN TO GRIBBLE\n";
-				}//ENDIF KEYSIG UNKNOWN TO GRIBBLE
-			}//NEXT SIGDONE
-			$ALL_SIGS_DONE=true;
-			print "\nALL_SIGS_DONE=$ALL_SIGS_DONE ALL_SIGS_RECEIVED=$ALL_SIGS_RECEIVED\nSIGSDONE=\n";
-			rdisp($SIGSDONE);
+	foreach($SIGSDONE as $sdk=>$sdv){
+		print "\nsdk=$sdk ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST sdv=\n";
+		rdisp($sdv);
+		if(!$sdv['asked_KEYID']){
+			$ASKING_KEYID=$sdk;
+			$SIGSDONE[$sdk]['asked_KEYID']=microtime(true);
+			send('PRIVMSG gribble :;;gpg info --key '.$sdk);
+			return(false);
+		}//ENDIF ASK ALL KEYIDs ONE AT A TIME FIRST PASS
 
+		if($sdv['asked_KEYID'] && $sdv['done_KEYID'] && !$sdv['asked_TRUST'] && $sdv['nick'] && !isset($sdv['unknown_KEYID']) ){
+			$ASKING_TRUST=$sdk;
+			$SIGSDONE[$sdk]['asked_TRUST']=microtime(true);
+			send('PRIVMSG gribble :;;gettrust assbot '.$sdv['nick']);
+			return(false);
+		}//ENDIF ASK TRUST SECOND PASS UNLESS ALREADY MARKED UNKNOWN
 
-		}else{
-			print "\nBUNDLE_TRUST_SCAN: NOT DONE. NICK_COUNT=$NICK_COUNT != KEY_COUNT=$KEY_COUNT\n";
-		}//ENDIF RESPONSE COUNT MATCHES KEY COUNT
-	}else{
-		"\nBUNDLE_TRUST_SCAN: NOT ENOUGH DATA YET.\n";
-	}//ENDIF SOMETHING THERE
+		if($SIGSDONE[$sdk]['done_TRUST'] || isset($SIGSDONE[$sdk]['unknown_KEYID']) ){
+			$DONE_COUNTER++;
+		}//ENDIF DONE WITH THIS KEYID
+		$KEYID_COUNTER++;
+
+	}//NEXT KEY AND TRUST QUERY TALLY
+
+	print "\nBUNDLE_TRUST_DONE_YET = NO UNHANDLED PENDING KEYIDs FOUND -- PRESUMED DONE\n";
+	print "\nBUNDLE_TRUST_DONE_YET ... ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST";
+	print "\nDONE_COUNTER = $DONE_COUNTER ... KEYID_COUNTER $KEYID_COUNTER\n";
+	if(!$ASKING_KEYID && !$ASKING_TRUST && ($KEYID_COUNTER == $DONE_COUNTER)){
+		print "\nNO UNHANDLEDS PENDING, NO ASKINGS DONE_COUNTER = $DONE_COUNTER = KEYID_COUNTER $KEYID_COUNTER -- PRESUMED DONE\n";
+		$ALL_SIGS_DONE=true;
+		$ALL_SIGS_RECEIVED=true;
+	}//ENDIF FLAG STUFF DONE
+	rdisp($SIGSDONE);
+
 }//END FUNCTION BUNDLE_TRUST_DONE_YET
 //######################################
 
@@ -779,8 +694,8 @@ function CHECK_BLOCKIO_BTC_BALANCE($chan=false){
 	global $DEBUG;
 	if(!$chan){$chan=$DEEDBOT_CHAN;}
 	$block_io=new BlockIo(); //fresh object
-	$REAL_FROM_ADDR='1NTSD9jVvumurTotaW7Crqe5DfRxBrJzqu'; //this is the block.io wallet address
-	$apiKeyBTC='[YOUR BLOCK.IO API KEY HERE]'; //BITCOIN REAL NEW ACCOUNT 0.0016 BTC = $0.76 ON 15-SEP-2014
+	$REAL_FROM_ADDR='1NTSD9jVvumurTotaW7Crqe5DfRxBrJzqu'; //this is the block.io wallet
+	$apiKeyBTC='[block.io BTC api key Here]'; //BITCOIN REAL NEW ACCOUNT 0.0016 BTC = $0.76 ON 15-SEP-2014
 	$Q=$block_io->set_key($apiKeyBTC);
 	$BALANCE=$block_io->get_balance();
 	$ABALANCE=get_object_vars($BALANCE);
@@ -833,7 +748,7 @@ function SEND_BTC($ADDR=false){
 	global $DEBUG;
 	global $block_io;
 
-	$apiKeyBTC='[YOUR BLOCK.IO REAL BITCOIN SPEND API KEY HERE]'; //BITCOIN REAL NEW ACCOUNT 0.0016 BTC = $0.76 ON 15-SEP-2014
+	$apiKeyBTC='[block.io API BTC key HERE again]'; //BITCOIN REAL NEW ACCOUNT 0.0016 BTC = $0.76 ON 15-SEP-2014
 	$apiKeyBTCTEST='a3d4-d6eb-5077-a806'; //use testnet for debugging
 
 	if(strlen($ADDR)!=34 || ($ADDR[0]!='m' && $ADDR[0]!='1') ){
@@ -856,7 +771,7 @@ function SEND_BTC($ADDR=false){
 	$REAL_FROM_ADDR='1NTSD9jVvumurTotaW7Crqe5DfRxBrJzqu'; //this is the block.io wallet
 	$REAL_TO_ADDR='18AyhuG8VvLqJFvoRH5LGUZPZJ8eN5J6Fz'; //sends back to the block.io wallet account
 
-	$SECRET_PIN='[YOUR BLOCK.IO SECRET PIN CODE HERE]';
+	$SECRET_PIN='[secret PIN number to spend BTC Here]';
 	
 	$COIN_VERSION_DIGIT=$ADDR[0];
 	if($COIN_VERSION_DIGIT=='m'){
@@ -884,8 +799,8 @@ function SEND_BTC($ADDR=false){
 	if($DEBUG){print "\n<hr>SPEND ORDER\n";rdisp($ORDER);}
 	$ORDER['pin']=$SECRET_PIN;
 
-	//$QSEND=array('error'=>'testing not sent'); //to skip sending
-	$QSEND=$block_io->withdraw_from_addresses($ORDER); //really send
+	//$QSEND=array('error'=>'testing not sent');send("PRIVMSG $DEEDBOT_CHAN :(spending is turned off inside SEND_BTC() for testing.)"); //to skip sending
+	$QSEND=$block_io->withdraw_from_addresses($ORDER); //REALLY SEND
 	if($DEBUG){print "\n<hr>RESULT OF SEND API\n";rdisp($QSEND);}
 
 	sleep(5);
@@ -951,7 +866,7 @@ function FIND_AND_BUNDLE_PENDING_DEEDS(){
 			unlink($BUNDLE_QUEUE_PATH.'/'.$dv);
 		}//ENDIF DELETE A NOW-BUNDLED CONTRACT
 	}//NEXT DELETE NOW-BUNDLED CONTRACTS
-	print `ls -al $BUNDLE_QUEUE_PATH/*.txt`; //this is entirely diagnostic. don't do things like this.
+	print `ls -al $BUNDLE_QUEUE_PATH/*.txt`;
 
 	return(false);
 
@@ -996,8 +911,8 @@ function SPEND_TO_UNSPENT_BUNDLES(){
 						send("PRIVMSG $ERROR_CHAN :BTC SPENT: amount_withdrawn = $AMOUNT_WITHDRAWN   TRACKING: $SPENT_BUNDLE_FILENAME");
 						send("PRIVMSG $DEEDBOT_CHAN :BTC SPENT: amount_withdrawn = $AMOUNT_WITHDRAWN   TRACKING: $SPENT_BUNDLE_FILENAME");
 					}else{
-						send("PRIVMSG $ERROR_CHAN :BTC SPENT FAILED -- PENDING: $UNSPENT_BUNDLE_FILENAME");
-						send("PRIVMSG $DEEDBOT_CHAN :BTC SPENT FAILED -- PENDING: $UNSPENT_BUNDLE_FILENAME");			
+						send("PRIVMSG $ERROR_CHAN :BTC SPEND FAILED -- PENDING: $UNSPENT_BUNDLE_FILENAME");
+						send("PRIVMSG $DEEDBOT_CHAN :BTC SPEND FAILED -- PENDING: $UNSPENT_BUNDLE_FILENAME");			
 					}//ENDIF SPEND SUCCEEDED
 				}else{
 					send("PRIVMSG $ERROR_CHAN :bogus BUNDLE_SPEND_ADDRESS for: $UNSPENT_BUNDLE_FILENAME = $uv");
@@ -1054,6 +969,128 @@ Array
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+<pre>Array
+(
+    [address] => 1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7
+    [bundle_file] => ./DEEDS/BUNDLE_DONE/BUNDLE_PENDING-1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7.txt
+    [bundle_url] => http://www.postalrocket.com/TJ/DEEDS/BUNDLE_DONE/BUNDLE_PENDING-1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7.txt
+    [SPENT] => Array
+        (
+            [source] => 1NTSD9jVvumurTotaW7Crqe5DfRxBrJzqu
+            [destination] => 1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7
+            [amount] => 0.0001
+            [spend] => Array
+                (
+                    [error] => testing not sent
+                )
+
+            [balance] => Array
+                (
+                    [status] => success
+                    [data] => Array
+                        (
+                            [network] => BTC
+                            [available_balance] => 0.00105000
+                            [unconfirmed_sent_balance] => -0.00044000
+                            [unconfirmed_received_balance] => 0.00000000
+                            [user_id] => 0
+                            [address] => 1NTSD9jVvumurTotaW7Crqe5DfRxBrJzqu
+                            [label] => default
+                        )
+
+                )
+
+        )
+
+)
+</pre>
+
+
+
+{"address":"1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7","bundle_file":".\/DEEDS\/BUNDLE_DONE\/BUNDLE_PENDING-1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7.txt","bundle_url":"http:\/\/www.postalrocket.com\/TJ\/DEEDS\/BUNDLE_DONE\/BUNDLE_PENDING-1CRFaGmALMgK45ggLnrQXqyGyGoFXi7yc7.txt","SPENT":{"source":"mg68NmsW7gfUgAV8LSLJoiFq44sQnYUC56","destination":"mqpeMfETdcR1BWHLfVCb53JVjrSxcTQkfg","amount":0.0001,"spend":{"status":"success","data":{"network":"BTCTEST","txid":"d14b70f09c9188a374214b9e1638ce95a24a4d7f70af97dfc5313862556b34d4","amount_withdrawn":"0.00011000","amount_sent":"0.00010000","network_fee":"0.00001000","blockio_fee":"0.00000000"}},"balance":{"status":"success","data":{"network":"BTCTEST","available_balance":"0.00978000","unconfirmed_sent_balance":"-0.00011000","unconfirmed_received_balance":"0.00000000","user_id":0,"address":"mg68NmsW7gfUgAV8LSLJoiFq44sQnYUC56","label":"default"}}}}
+*/
+
+
+
+
+
+
 //##################
 //##################
 //#### M A I N #####
@@ -1088,7 +1125,6 @@ $LAST_PING_TIME=time();
 
 
 //#### CONFIGURE AND INITIALIZE ####
-//#### SOME PARAMETERS MAY BE INITIALIZED ELSEWHERE ####
 
 //$USE_BLOCKCHAIN_INFO=true;  //use blockchain.io API
 $USE_BLOCKCHAIN_INFO=false;  //resort to scraping bkchain.org
@@ -1117,6 +1153,9 @@ $PREVIOUS_BLOCK_HASH='initialize';
 
 $BUNDLE_SPENDING_INTERVAL=3600; //seconds
 
+$ASKING_KEYID=false;
+$ASKING_TRUST=false;
+
 $BUNDLE_HANDLED=false;
 $BUNDLE_ACTIVE=false;
 $ALL_SIGS_DONE=false;
@@ -1137,7 +1176,9 @@ $TRACKING_VERBOSE=true; //announce all tracking events
 
 
 
-$rawdata=''; //incoming IRC data
+
+
+$rawdata='';
 
 
 
@@ -1221,41 +1262,7 @@ if(!feof($FHI) && $FHI){
 	}//ENDIF PING/PONG
 
 
-/*
-<MolokoDesk> "Services provided by blockchain.info are free of charge. Please do not abuse them."  --  https://blockchain.info/api
-<MolokoDesk> Warning: file_get_contents(https://blockchain.info/q/latesthash): failed to open stream: HTTP request failed! HTTP/1.1 403 Forbidden
-<MolokoDesk> Warning: file_get_contents(https://blockchain.info/block-index/?format=json): failed to open stream: HTTP request failed! HTTP/1.1 403 Forbidden
-<MolokoDesk> For an API Code to bypass the request limiter please Request An API Code.
-<MolokoDesk> Requests in 8 Hours: 10 (Soft Limit = 28800, Hard Limit = 28900) 
-<MolokoDesk> Requests in 5 minutes: 1 (Soft Limit = 700, Hard Limit = 725) 
-<MolokoDesk> Request Submitted. Please check your email shortly for an API code.  (Permissions:
-<MolokoDesk> Increased Request Limits)
 
-Name: deedBot (This is the name of your website or application that needs to use the api.)
-Email: [MolokoDesk's email]
-URL: http://www.postalrocket.com
-Description: track a transaction to inclusion in blockchain. examine latest block as often as once every 90 - 30 seconds while transaction is pending. New transaction once per hour (possible more requests during testing and development)
-Permissions: Increased Request Limits
-
-Once approved the API Code can be passed to all requests in the "api_code" parameter e.g. https://blockchain.info?api_code=$your_code
-
-
-
-
-Warning: file_get_contents(https://blockchain.info/q/latesthash): failed to open stream: HTTP request failed! HTTP/1.1 403 Forbidden
- in /home/postalrocket/DEEDS/deedBot.php on line 121
-
-Warning: file_get_contents(https://blockchain.info/block-index/?format=json): failed to open stream: HTTP request failed! HTTP/1.1 403 Forbidden
- in /home/postalrocket/DEEDS/deedBot.php on line 122
-
-Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/deedBot.php on line 138
-
-Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/deedBot.php on line 158
-:wilhelm.freenode.net PONG wilhelm.freenode.net :chat.freenode.net
-
-
-
-*/
 
 
 
@@ -1289,7 +1296,7 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 		$xtime=time();
 		$xdiff=$xtime-$TRACKING_LAST_BUNDLE_TIME;
 		send("PRIVMSG $chan :time=$xtime LAST_BUNDLE_TIME=$TRACKING_LAST_BUNDLE_TIME elapsed=$xdiff");
-
+		print "\n\n-------DUMP-----------\n";
 		rdisp($PENDING_BUNDLES);
 		foreach($PENDING_BUNDLES as $bk=>$bv){
 			$TQMSG=$bk.' = ';
@@ -1323,35 +1330,18 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 		print `ls -al $BUNDLE_QUEUE_PATH/*.txt`;
 		rdisp($DARR);
 
+		print "\nGRIBBLE_DATA=";
+		rdisp($GRIBBLE_DATA);
+		print "\nSIGSDONE ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST";
+		rdisp($SIGSDONE);
 
+		print "\n\n-------END DUMP-----------\n";
 	}//ENDIF DUMP VARIABLES FOR TESTING
 
 
-	//TRACK A FAKED BUNDLE
-	if(preg_match('/(\#\S+)\s+:([\?\+\!\.\=])(faketrack)/i',$rawdata,$px)){
-		$QERR=FAKE_TRACKABLE_PENDING_BUNDLES();
-		if($QERR=='error'){
-			send("PRIVMSG $DEEDBOT_CHAN :(*** ERROR: Fake pending bundle file not created.)");
-		}elseif($QERR){
-			send("PRIVMSG $DEEDBOT_CHAN :(Fake pending bundle file created. Will be tracked to blockchain.)");
-		}else{
-			send("PRIVMSG $DEEDBOT_CHAN :(No pending bundle file created. No unconfirmed transactions found.)");
-		}//ENDIF NOTIFY THEM
-	}//ENDIF TRACK A FAKE BUNDLE
 
 
-	//FORCE BUNDLE TO UNSPENT
-	if(preg_match('/(\#\S+)\s+:([\?\+\!\.\=])(forcebundle)/i',$rawdata,$px)){
-		send("PRIVMSG $DEEDBOT_CHAN :(FORCE FIND_AND_BUNDLE_PENDING_DEEDS.)");
-		FIND_AND_BUNDLE_PENDING_DEEDS();
-	}//ENDIF TRACK A FAKE BUNDLE
 
-
-	//FORCE SPEND TO PENDING BUNDLES
-	if(preg_match('/(\#\S+)\s+:([\?\+\!\.\=])(forcespend)/i',$rawdata,$px)){
-		send("PRIVMSG $DEEDBOT_CHAN :(FORCE SPEND_TO_UNSPENT_BUNDLES.)");
-		SPEND_TO_UNSPENT_BUNDLES();
-	}//ENDIF TRACK A FAKE BUNDLE
 
 
 	if(preg_match('/(\#\S+)\s+:[\?\+\!\.\=]interval\s+([\d]+)/i',$rawdata,$px)){
@@ -1405,27 +1395,6 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 
 
 
-	//SEND TO GRIBBLE...
-	if(preg_match('/([\#\S]+)\s+:([\+\!\.])(gribble)\s+([^\r\n]+)[\r\n]*/i',$rawdata,$px)){
-		$gribblechan=GetChan($rawdata);
-		$token=$px[2];
-		$cmdword=$px[3];
-		$gparam=$px[4];
-		send('PRIVMSG gribble :'.$gparam);
-		//print "\n\ngparam=$gparam\ngribblechan=$gribblechan\n";rdisp($px);
-	}//ENDIF gribble
-
-
-	//.gribble ;;gpg info --key C58B15FA3E19CE9B
-	if(preg_match('/([\#\S]+)\s+:([\+\!\.])(infokey)\s*([\S]+)[\r\n]*/i',$rawdata,$px)){
-		$gribblechan=GetChan($rawdata);
-		$token=$px[2];
-		$cmdword=$px[3];
-		$gparam=$px[4];
-		send('PRIVMSG gribble :;;gpg info --key '.$gparam);
-	}//ENDIF infokey
-
-
 
 
 //####### GRIBBLE RESPONSES ########
@@ -1440,22 +1409,29 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 */
 
 
+
 	//### GRIBBLE KEYID+NICK RESPONSE
 	if(preg_match('/:gribble\!.*?PRIVMSG\s*deedBot\s+:User\s+\'(.+?)\'.*?with\s+keyid\s+([A-F0-9a-f]+)/i',$rawdata,$knx)){
 		print "\n\n-------KEYID+NICK--------\n".$rawdata;
+		print "ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST\n";
 		rdisp($knx);
 		$KID_NICK=$knx[1];
 		$KID_KEY=$knx[2];
 		$GRIBBLE_DATA['NICKS'][$KID_NICK]['KEY']=$KID_KEY;
 		$GRIBBLE_DATA['KEYS'][$KID_KEY]['NICK']=$KID_NICK;
-		send("PRIVMSG gribble :;;gettrust assbot $KID_NICK");
+		$SIGSDONE[$KID_KEY]['done_KEYID']=microtime(true);
+		$SIGSDONE[$KID_KEY]['nick']=$KID_NICK;
 		rdisp($GRIBBLE_DATA);
+		if($KID_KEY==$ASKING_KEYID){$ASKING_KEYID=false;}else{print "\nKID_KEY $KID_KEY != ASKING_KEYID $ASKING_KEYID\n";}
+		BUNDLE_TRUST_DONE_YET(); //this asks gribble for the next appropriate thing
 	}//ENDIF GRIBBLE KEYID+NICK RESPONSE
 
 
 	//### GRIBBLE NICK+ASSBOT_TRUST RESPONSE
 	if(preg_match('/:gribble\!.*?PRIVMSG\s*deedBot\s+:.*?Trust.*?user\s+assbot\s+to\s+user\s+([^\s]+):.+?Level\s+1:\s*([0-9]+).+?Level\s+2:\s*([0-9]+)/i',$rawdata,$knt)){
 		print "\n\n-------NICK+ASSBOT_TRUST--------\n".$rawdata;
+		print "ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST\n";
+		rdisp($SIGSDONE);
 		rdisp($knt);
 		$TRUST_NICK=$knt[1];
 		$TRUST_LEVEL1=intval($knt[2]);
@@ -1465,8 +1441,11 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 		$GRIBBLE_DATA['NICKS'][$TRUST_NICK]['TIME']=microtime(true);
 		$TRUST_KEY=$GRIBBLE_DATA['NICKS'][$TRUST_NICK]['KEY'];
 		$GRIBBLE_DATA['KEYS'][$TRUST_KEY]['TRUST']=$TRUST_SUM;
+		$SIGSDONE[$ASKING_TRUST]['done_TRUST']=microtime(true);
+		$SIGSDONE[$ASKING_TRUST]['trust']=$TRUST_SUM;
 		rdisp($GRIBBLE_DATA);
-		BUNDLE_TRUST_DONE_YET();
+		if($TRUST_NICK=$ASKING_TRUST){$ASKING_TRUST=false;}else{print "\nTRUST_NICK $TRUST_NICK != ASKING_TRUST $ASKING_TRUST\n";}
+		BUNDLE_TRUST_DONE_YET(); //this asks gribble for the next appropriate thing
 	}//ENDIF GRIBBLE NICK+ASSBOT_TRUST RESPONSE
 
 
@@ -1476,6 +1455,8 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 	//### GRIBBLE NO SUCH USER REGISTERED RESPONSE
 	if(preg_match('/:gribble\!.*?PRIVMSG\s*deedBot\s+:.*?(No\s+such\s+user\s+registered)\./i',$rawdata,$kut)){
 		print "\n\n-------NO SUCH USER REGISTERED--------\n".$rawdata;
+		print "ASKING_KEYID=$ASKING_KEYID ASKING_TRUST=$ASKING_TRUST\n";
+		rdisp($SIGSDONE);
 		rdisp($kut);
 		$NOSUCH_NICK='No such user registered.';
 		$GRIBBLE_DATA['NICKS'][$NOSUCH_NICK]['TRUST']=false;
@@ -1484,32 +1465,20 @@ Warning: Invalid argument supplied for foreach() in /home/postalrocket/DEEDS/dee
 		$GRIBBLE_DATA['NICKS']['No such user registered.']['COUNT']++;
 		$GRIBBLE_DATA['NICKS']['No such user registered.']['TIME']=microtime(true);
 		rdisp($GRIBBLE_DATA);
+		if($ASKING_KEYID){
+			$SIGSDONE[$ASKING_KEYID]['done_KEYID']=microtime(true);
+			$SIGSDONE[$ASKING_KEYID]['nick']=false;
+			$SIGSDONE[$ASKING_KEYID]['unknown_KEYID']=microtime(true);
+			$ASKING_KEYID=false;
+		}//ENDIF ASKING ABOUT NICK FOR KEYID
+		if($ASKING_TRUST){
+			$SIGSDONE[$ASKING_TRUST]['done_TRUST']=microtime(true);
+			$ASKING_TRUST=false;
+			$SIGSDONE[$ASKING_KEYID]['trust']=false;
+			$SIGSDONE[$ASKING_KEYID]['unknown_TRUST']=microtime(true);
+		}//ENDIF ASKING ABOUT NICK FOR KEYID
+		BUNDLE_TRUST_DONE_YET(); //this asks gribble for the next appropriate thing
 	}//ENDIF GRIBBLE NO SUCH USER REGISTERED RESPONSE
-
-
-	//### UNIT TEST FOR GRIBBLE TRUST KEY+NICK RESPONSES
-	if(preg_match('/([\#\S]+)\s+:([\+\!\.])(forcegribble)/i',$rawdata,$px)){
-		$gribblechan=GetChan($rawdata);
-		print "\n\n-------ForceGribble--------\n".$rawdata;
-		$GRIBBLE_DATA=array();	//RESETTING THIS ... MAY BE SUSCEPTIBLE TO .deed pastebin FLOODING ATTACK
-		$GRIBBLE_DATA['KEYS']['35D2E1A0457E6498']=array('NICK'=>false,'TRUST'=>false,'TIME'=>microtime(true));
-		$GRIBBLE_DATA['KEYS']['C58B15FA3E19CE9B']=array('NICK'=>false,'TRUST'=>false,'TIME'=>microtime(true));
-		$GRIBBLE_DATA['KEYS']['999BBBBBBBBBBBBB']=array('NICK'=>false,'TRUST'=>false,'TIME'=>microtime(true));
-
-		foreach($GRIBBLE_DATA['KEYS'] as $gkk=>$gkv){
-			send('PRIVMSG gribble :;;gpg info --key '.$gkk);
-			usleep(500);
-		}//NEXT KEY TO SCAN
-
-	}//ENDIF GRIBBLE TEST
-
-
-
-
-
-
-
-
 
 
 
@@ -1636,23 +1605,33 @@ Array
 SIGSDONE=
 Array
 (
-    [35D2E1A0457E6498] => Array
+    [72F18AA55B8D4EBE] => Array
         (
-            [done] => 1
-            [nick] => RagnarDanneskjol
-            [trust] => 2
+            [asked_KEYID] => 1411788775.1633
+            [asked_TRUST] =>
+            [done_KEYID] => 1411788777.1823
+            [done_TRUST] =>
+            [done] =>
+            [nick] =>
+            [trust] =>
             [chan] => #love2
+            [unknown_KEYID] => 1411788777.1824
         )
 
-    [C58B15FA3E19CE9B] => Array
+    [35D2E1A0457E6498] => Array
         (
+            [asked_KEYID] => 1411788777.1828
+            [asked_TRUST] => 1411788777.5836
+            [done_KEYID] => 1411788777.5824
+            [done_TRUST] => 1411788778.3334
             [done] =>
-            [nick] => ?pending
-            [trust] =>
+            [nick] => RagnarDanneskjol
+            [trust] => 3
             [chan] => #love2
         )
 
 )
+
 
 from DEED_BUNDLER.php:
 
@@ -1668,6 +1647,18 @@ from DEED_BUNDLER.php:
 
 
 
+
+
+
+	//PRIVMSG gribble :;;eauth MolokoDesk
+	//:gribble!~gribble@unaffiliated/nanotube/bot/gribble PRIVMSG MolokoDesk :Request successful for user MolokoDesk, hostmask MolokoDesk!~moloko@cpe-173-174-89-188.austin.res.rr.com. Get your encrypted OTP from http://bitcoin-otc.com/otps/C58B15FA3E19CE9B
+	// PRIVMSG gribble :;;gpg everify freenode:#bitcoin-otc:1c64f7b2a973a1f86dedbf1e7d85ac2124715094f932ea7e56482baa
+	//:gribble!~gribble@unaffiliated/nanotube/bot/gribble PRIVMSG MolokoDesk :Error: In order to authenticate, you must be present in one of the following channels: #bitcoin-otc;#bitcoin-otc-foyer;#bitcoin-otc-ru;#bitcoin-otc-eu;#bitcoin-otc-uk;#bitcoin-otc-bans;#bitcoin-dev;#gribble;#bitcoin-assets;#bitcoin-fr
+	//JOIN #bitcoin-otc
+	//PRIVMSG gribble :;;gpg everify freenode:#bitcoin-otc:1c64f7b2a973a1f86dedbf1e7d85ac2124715094f932ea7e56482baa
+	//:gribble!~gribble@unaffiliated/nanotube/bot/gribble PRIVMSG MolokoDesk :You are now authenticated for user MolokoDesk with key C58B15FA3E19CE9B
+
+
 /*
 <MolokoDeck> ;;gettrust assbot MolokoDesk
 <gribble> WARNING: Currently not authenticated. Trust relationship from user assbot to user MolokoDesk: Level 1: 0, Level 2: 0 via 0 connections. Graph: http://b-otc.com/stg?source=assbot&dest=MolokoDesk | WoT data: http://b-otc.com/vrd?nick=MolokoDesk | Rated since: Wed Sep  3 07:34:49 2014
@@ -1681,36 +1672,11 @@ from DEED_BUNDLER.php:
 
 
 
-	//SEND TO GRIBBLE REGARDING ASSBOT TRUST...
-	if(preg_match('/([\#\S]+)\s+:([\+\!\.])(trustass|assbot|asstrust|atrust)\s+([^\r\n]+)[\r\n]*/i',$rawdata,$px)){
-		//print "\n\n(1)assbot_key=$assbot_key\nassbot_nick=$assbot_nick\nassbot_timeout=$assbot_timeout\n\n";
-		$assbotchan=GetChan($rawdata);
-		$token=$px[2];
-		$cmdword=$px[3];
-		$aparam=$px[4];
-		if(preg_match('/[A-F0-9]{16}/',$aparam)){
-			$assbot_key=$aparam;
-			$assbot_timeout=time();
-			$assbot_nick=false;
-			$assbot_trust=-1;
-			$assbot_level1=0;
-			$assbot_level2=0;
-			send('PRIVMSG gribble :;;gpg info --key '.$assbot_key);
-			//send('PRIVMSG gribble :;;gettrust assbot'.$assbot_key);
-			//print "\n\ngparam=$gparam\ngribblechan=$gribblechan\n";rdisp($px);
-			send('PRIVMSG '.$assbotchan.' :Examining KeyID: '.$assbot_key);
-		}else{
-			send('PRIVMSG '.$assbotchan.' :not a valid 16 Digit KeyID: '.$assbot_key);
-			$assbot_key=false;
-			$assbot_timeout=0;
-			$assbot_nick=false;
-		}//ENDIF KEYSIG SEEN
-		//print "\n\n(2)assbot_key=$assbot_key\nassbot_nick=$assbot_nick\nassbot_timeout=$assbot_timeout\n\n";
-	}//ENDIF assbot trust metric
 
-
-
-//http://pastebin.com/UxAmPFvL
+//TEST CASES:
+//http://pastebin.com/UxAmPFvL (RD,MD)
+//http://pastebin.com/QzPGJbj6 (ALF,RD)
+//http://pastebin.com/BrkxYBrh (TJ,RD,MD)?
 
 	//SPLIT PASTEBIN DOCUMENT BUNDLE OF DEEDS...
 	if(preg_match('/([\#\S]+)\s+:([\+\!\.])(deeds*|notary|notarize|contracts*)\s+(https*:\/\/[^\r\n\s]+)[\s\r\n]*/i',$rawdata,$px)){
@@ -1743,22 +1709,19 @@ from DEED_BUNDLER.php:
 								$NSIGS=intval($qv['nsigs']);
 								if($NSIGS==1){$SIGZ='signatory';}elseif($NSIGS>1){$SIGZ='signatories';}else{}
 								send("PRIVMSG $chan :KeyID: $KEYID deed with $NSIGS $SIGZ.");
-								$SIGSDONE[$KEYID]=array('done'=>false,'nick'=>false,'trust'=>false,'chan'=>$chan);
+								$SIGSDONE[$KEYID]=array('asked_KEYID'=>false,'asked_TRUST'=>false,'done_KEYID'=>false,'done_TRUST'=>false,'done'=>false,'nick'=>false,'trust'=>false,'chan'=>$chan);
 							}//ENDIF DECODE JSON RESULT
+
+
 							if(count($SIGSDONE)>0){
-								$FIRST_DONE=false;
-								foreach($SIGSDONE as $sgk=>$sgv){
-									if(!$sgv['done'] && !$FIRST_DONE && !$sgv['nick']){
-										//ask gribble...
-										$assbotchan=$sgv['chan'];
-										$assbot_key=$sgk;
-										send('PRIVMSG gribble :;;gpg info --key '.$sgk);
-										$FIRST_DONE=true;
-										print "\n\nASKING GRIBBLE FOR INITIAL KEY: $sgk\n\n";
-										$BUNDLE_ACTIVE=true;
-									}//ENDIF NOT DONE YET
-								}//NEXT SIGNATURE
-							}//ENDIF FOUND SIGNATURES TO VERIFY
+								print "\n.deeds invoked ... first call to: BUNDLE_TRUST_DONE_YET\n";
+								rdisp($SIGSDONE);
+								BUNDLE_TRUST_DONE_YET();
+							}else{
+								print "\n.deeds invoked ... NO SIGSDONE?\n";
+								rdisp($SIGSDONE);
+							}//ENDIF START ASKING GRIBBLE
+
 						}else{
 							send("PRIVMSG $chan :No signed deeds were found in: $param");
 						}//ENDIF DEEDS PRESENT						
@@ -1789,9 +1752,7 @@ from DEED_BUNDLER.php:
 
 
 
-/*
 
-	//## don't do this, but someone asked...
 
 	if(preg_match('/([\#\S]+)\s+:[\+\!\.\=](wolfram|alpha)\s*(.*)/i',$rawdata,$px)){
 		$chan=GetChan($rawdata);
@@ -1811,7 +1772,7 @@ from DEED_BUNDLER.php:
 	}//ENDIF CALC
 
 
-*/
+
 
 
 
